@@ -21,6 +21,7 @@ export async function POST(request: Request) {
 
     const finalName = fullName || name;
 
+    // Required fields
     if (!finalName || !email || !phone || !password || !role) {
       return NextResponse.json(
         {
@@ -31,8 +32,27 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check valid role
+    const validRoles = [
+      "patient",
+      "doctor",
+      "receptionist",
+      "admin",
+    ];
+
+    if (!validRoles.includes(role)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid role.",
+        },
+        { status: 400 }
+      );
+    }
+
     const cleanEmail = email.toLowerCase().trim();
 
+    // Admin verification
     if (role === "admin") {
       const correctAdminCode =
         process.env.ADMIN_VERIFICATION_CODE ||
@@ -49,6 +69,7 @@ export async function POST(request: Request) {
       }
     }
 
+    // Check existing account
     const existingUser = await User.findOne({
       email: cleanEmail,
     });
@@ -63,8 +84,10 @@ export async function POST(request: Request) {
       );
     }
 
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Create user
     const user = await User.create({
       name: finalName,
       email: cleanEmail,
