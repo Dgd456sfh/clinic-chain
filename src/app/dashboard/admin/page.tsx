@@ -1,0 +1,472 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  ShieldCheck,
+  Stethoscope,
+  Users,
+  UserRound,
+  LogOut,
+  Trash2,
+} from "lucide-react";
+
+type User = {
+  _id: string;
+  name: string;
+  email: string;
+  role: "doctor" | "receptionist" | "patient";
+  createdAt: string;
+};
+
+export default function AdminDashboard() {
+  const [adminName, setAdminName] = useState("Admin");
+
+  const [doctors, setDoctors] = useState<User[]>([]);
+  const [receptionists, setReceptionists] = useState<User[]>([]);
+  const [patients, setPatients] = useState<User[]>([]);
+
+  const [activeTab, setActiveTab] = useState<
+    "doctors" | "receptionists" | "patients"
+  >("doctors");
+
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // ================= LOAD DATA =================
+
+  async function loadData() {
+    try {
+      const meResponse = await fetch("/api/auth/me");
+      const meData = await meResponse.json();
+
+      if (
+        !meResponse.ok ||
+        !meData.success ||
+        meData.user.role !== "admin"
+      ) {
+        window.location.href = "/login";
+        return;
+      }
+
+      setAdminName(meData.user.name);
+
+      const response = await fetch("/api/admin/users");
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(data.message || "Failed to load users.");
+        return;
+      }
+
+      setDoctors(data.doctors || []);
+      setReceptionists(data.receptionists || []);
+      setPatients(data.patients || []);
+    } catch (error) {
+      console.error(error);
+      setMessage("Unable to load admin data.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ================= REMOVE USER =================
+
+  async function removeUser(user: User) {
+    const confirmed = window.confirm(
+      `Are you sure you want to remove ${user.name}?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(
+        `/api/admin/users/${user._id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Failed to remove user.");
+        return;
+      }
+
+      if (user.role === "doctor") {
+        setDoctors((current) =>
+          current.filter((item) => item._id !== user._id)
+        );
+      }
+
+      if (user.role === "receptionist") {
+        setReceptionists((current) =>
+          current.filter((item) => item._id !== user._id)
+        );
+      }
+
+      if (user.role === "patient") {
+        setPatients((current) =>
+          current.filter((item) => item._id !== user._id)
+        );
+      }
+
+      alert(data.message || "User removed successfully.");
+    } catch (error) {
+      console.error(error);
+      alert("Something went wrong.");
+    }
+  }
+
+  // ================= LOGOUT =================
+
+  async function logout() {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+    });
+
+    window.location.href = "/login";
+  }
+
+  // ================= CURRENT USERS =================
+
+  const currentUsers =
+    activeTab === "doctors"
+      ? doctors
+      : activeTab === "receptionists"
+      ? receptionists
+      : patients;
+
+  return (
+    <main className="min-h-screen bg-sky-50">
+
+      {/* HEADER */}
+
+      <header className="border-b border-sky-100 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
+
+          <div className="flex items-center gap-3">
+
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
+              <ShieldCheck size={23} />
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-sky-600">
+                Clinic-Chain
+              </p>
+
+              <h1 className="text-xl font-bold text-slate-900">
+                Admin Dashboard
+              </h1>
+            </div>
+
+          </div>
+
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            <LogOut size={17} />
+            Logout
+          </button>
+
+        </div>
+      </header>
+
+      {/* MAIN */}
+
+      <div className="mx-auto max-w-7xl px-6 py-10">
+
+        {/* WELCOME */}
+
+        <div className="mb-8">
+          <p className="text-sm font-semibold text-sky-600">
+            Administration
+          </p>
+
+          <h2 className="mt-1 text-3xl font-bold text-slate-900">
+            Welcome, {adminName}
+          </h2>
+
+          <p className="mt-2 text-slate-500">
+            Manage doctors, receptionists and patients.
+          </p>
+        </div>
+
+        {/* STAT CARDS */}
+
+        <div className="grid gap-5 md:grid-cols-3">
+
+          <StatCard
+            title="Doctors"
+            value={doctors.length}
+            icon={<Stethoscope size={22} />}
+          />
+
+          <StatCard
+            title="Receptionists"
+            value={receptionists.length}
+            icon={<Users size={22} />}
+          />
+
+          <StatCard
+            title="Patients"
+            value={patients.length}
+            icon={<UserRound size={22} />}
+          />
+
+        </div>
+
+        {/* USER MANAGEMENT */}
+
+        <section className="mt-8 rounded-3xl border border-sky-100 bg-white p-6 shadow-sm">
+
+          <div>
+            <h3 className="text-xl font-bold text-slate-900">
+              User Management
+            </h3>
+
+            <p className="mt-1 text-sm text-slate-500">
+              View and remove doctors, receptionists and patients.
+            </p>
+          </div>
+
+          {/* TABS */}
+
+          <div className="mt-6 flex gap-2 overflow-x-auto border-b border-slate-100 pb-2">
+
+            <Tab
+              active={activeTab === "doctors"}
+              onClick={() => setActiveTab("doctors")}
+              icon={<Stethoscope size={17} />}
+              text="Doctors"
+              count={doctors.length}
+            />
+
+            <Tab
+              active={activeTab === "receptionists"}
+              onClick={() => setActiveTab("receptionists")}
+              icon={<Users size={17} />}
+              text="Receptionists"
+              count={receptionists.length}
+            />
+
+            <Tab
+              active={activeTab === "patients"}
+              onClick={() => setActiveTab("patients")}
+              icon={<UserRound size={17} />}
+              text="Patients"
+              count={patients.length}
+            />
+
+          </div>
+
+          {/* MESSAGE */}
+
+          {message && (
+            <div className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-600">
+              {message}
+            </div>
+          )}
+
+          {/* USERS */}
+
+          {loading ? (
+
+            <div className="py-12 text-center text-sm text-slate-500">
+              Loading users...
+            </div>
+
+          ) : currentUsers.length === 0 ? (
+
+            <div className="py-12 text-center">
+
+              <Users
+                className="mx-auto text-slate-300"
+                size={40}
+              />
+
+              <p className="mt-3 font-semibold text-slate-600">
+                No {activeTab} found.
+              </p>
+
+            </div>
+
+          ) : (
+
+            <div className="mt-5 overflow-x-auto">
+
+              <table className="w-full text-left">
+
+                <thead>
+                  <tr className="border-b border-slate-100 text-sm text-slate-500">
+
+                    <th className="pb-3 font-semibold">
+                      Name
+                    </th>
+
+                    <th className="pb-3 font-semibold">
+                      Email
+                    </th>
+
+                    <th className="pb-3 font-semibold">
+                      Role
+                    </th>
+
+                    <th className="pb-3 font-semibold">
+                      Joined
+                    </th>
+
+                    <th className="pb-3 text-right font-semibold">
+                      Action
+                    </th>
+
+                  </tr>
+                </thead>
+
+                <tbody>
+
+                  {currentUsers.map((user) => (
+
+                    <tr
+                      key={user._id}
+                      className="border-b border-slate-100 last:border-0"
+                    >
+
+                      <td className="py-4 font-semibold text-slate-900">
+                        {user.name}
+                      </td>
+
+                      <td className="py-4 text-sm text-slate-500">
+                        {user.email}
+                      </td>
+
+                      <td className="py-4">
+
+                        <span className="rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-semibold capitalize text-sky-700">
+                          {user.role}
+                        </span>
+
+                      </td>
+
+                      <td className="py-4 text-sm text-slate-500">
+                        {new Date(
+                          user.createdAt
+                        ).toLocaleDateString()}
+                      </td>
+
+                      {/* REMOVE */}
+
+                      <td className="py-4 text-right">
+
+                        <button
+                          onClick={() => removeUser(user)}
+                          className="inline-flex items-center gap-2 rounded-lg border border-red-100 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                        >
+                          <Trash2 size={15} />
+                          Remove
+                        </button>
+
+                      </td>
+
+                    </tr>
+
+                  ))}
+
+                </tbody>
+
+              </table>
+
+            </div>
+
+          )}
+
+        </section>
+
+      </div>
+
+    </main>
+  );
+}
+
+
+// ================= STAT CARD =================
+
+function StatCard({
+  title,
+  value,
+  icon,
+}: {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm">
+
+      <div className="flex items-center justify-between">
+
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+          {icon}
+        </div>
+
+        <span className="text-3xl font-bold text-slate-900">
+          {value}
+        </span>
+
+      </div>
+
+      <p className="mt-5 text-sm font-medium text-slate-500">
+        {title}
+      </p>
+
+    </div>
+  );
+}
+
+
+// ================= TAB =================
+
+function Tab({
+  active,
+  onClick,
+  icon,
+  text,
+  count,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  text: string;
+  count: number;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+        active
+          ? "bg-sky-600 text-white"
+          : "bg-slate-50 text-slate-600 hover:bg-sky-50 hover:text-sky-600"
+      }`}
+    >
+      {icon}
+
+      {text}
+
+      <span
+        className={`rounded-full px-2 py-0.5 text-xs ${
+          active
+            ? "bg-white/20"
+            : "bg-white"
+        }`}
+      >
+        {count}
+      </span>
+    </button>
+  );
+}
