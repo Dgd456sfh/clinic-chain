@@ -73,12 +73,7 @@ export default function Home() {
               Login
             </Link>
 
-            <Link
-              href="/book-appointment"
-              className="rounded-full bg-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700 hover:shadow-lg"
-            >
-              Book Appointment
-            </Link>
+            
 
           </div>
 
@@ -125,12 +120,7 @@ export default function Home() {
                 Login
               </Link>
 
-              <Link
-                href="/book-appointment"
-                className="rounded-xl bg-sky-600 px-5 py-3 text-center font-semibold text-white"
-              >
-                Book Appointment
-              </Link>
+              
 
             </div>
 
@@ -191,12 +181,7 @@ export default function Home() {
 
             <div className="mt-8 flex flex-wrap gap-4">
 
-              <Link
-                href="/book-appointment"
-                className="rounded-full bg-sky-600 px-7 py-3.5 font-semibold text-white shadow-lg shadow-sky-200 transition hover:-translate-y-1 hover:bg-sky-700 hover:shadow-xl"
-              >
-                Book Appointment
-              </Link>
+              
 
               <Link
                 href="/register"
