@@ -2,6 +2,24 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { connectDB } from "@/lib/mongodb";
 import User from "@/models/User";
+import Patient from "@/models/Patient";
+
+async function generatePatientId() {
+  let patientId = "";
+
+  while (true) {
+    const randomNumber = Math.floor(100000 + Math.random() * 900000);
+    patientId = `CC-PAT-${randomNumber}`;
+
+    const existingPatient = await Patient.findOne({
+      patientId,
+    });
+
+    if (!existingPatient) {
+      return patientId;
+    }
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -17,12 +35,19 @@ export async function POST(request: Request) {
       password,
       role,
       adminCode,
+
+      // Patient fields
+      dateOfBirth,
+      gender,
+      address,
+      bloodGroup,
     } = body;
 
     const finalName = fullName || name;
+    const cleanEmail = email?.toLowerCase().trim();
 
-    // Required fields
-    if (!finalName || !email || !phone || !password || !role) {
+    // Required common fields
+    if (!finalName || !cleanEmail || !phone || !password || !role) {
       return NextResponse.json(
         {
           success: false,
@@ -32,7 +57,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check valid role
     const validRoles = [
       "patient",
       "doctor",
@@ -50,7 +74,29 @@ export async function POST(request: Request) {
       );
     }
 
-    const cleanEmail = email.toLowerCase().trim();
+    // Patient-specific validation
+    if (role === "patient") {
+      if (!dateOfBirth || !gender || !address) {
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "Date of birth, gender and address are required for patients.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (!["Male", "Female", "Other"].includes(gender)) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Invalid gender.",
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     // Admin verification
     if (role === "admin") {
@@ -69,7 +115,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Check existing account
+    // Check existing User account
     const existingUser = await User.findOne({
       email: cleanEmail,
     });
@@ -87,7 +133,60 @@ export async function POST(request: Request) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
+    // ================= PATIENT REGISTRATION =================
+
+    if (role === "patient") {
+      const patientId = await generatePatientId();
+
+      // Create Patient record
+      const patient = await Patient.create({
+        patientId,
+        fullName: finalName,
+        dateOfBirth: new Date(dateOfBirth),
+        gender,
+        phone,
+        email: cleanEmail,
+        password: hashedPassword,
+        address,
+        bloodGroup: bloodGroup || "Unknown",
+      });
+
+      try {
+        // Create login User account
+        const user = await User.create({
+          name: finalName,
+          email: cleanEmail,
+          phone,
+          password: hashedPassword,
+          role: "patient",
+        });
+
+        return NextResponse.json(
+          {
+            success: true,
+            message: "Patient account created successfully.",
+            patientId: patient.patientId,
+            user: {
+              id: user._id,
+              name: user.name,
+              email: user.email,
+              role: user.role,
+            },
+          },
+          { status: 201 }
+        );
+      } catch (userError) {
+        // If User creation fails, remove Patient record
+        await Patient.deleteOne({
+          _id: patient._id,
+        });
+
+        throw userError;
+      }
+    }
+
+    // ================= OTHER ROLES =================
+
     const user = await User.create({
       name: finalName,
       email: cleanEmail,

@@ -169,6 +169,7 @@ function RegistrationForm({
   });
 
   const [loading, setLoading] = useState(false);
+  const [patientId, setPatientId] = useState("");
 
   function handleChange(
     event: React.ChangeEvent<
@@ -211,13 +212,32 @@ function RegistrationForm({
           headers: {
             "Content-Type": "application/json",
           },
-
           body: JSON.stringify({
             fullName: formData.fullName,
             email: formData.email,
             phone: formData.phone,
             password: formData.password,
-            role: role,
+            role,
+
+            dateOfBirth:
+              role === "patient"
+                ? formData.dateOfBirth
+                : undefined,
+
+            gender:
+              role === "patient"
+                ? formData.gender
+                : undefined,
+
+            address:
+              role === "patient"
+                ? formData.address
+                : undefined,
+
+            bloodGroup:
+              role === "patient"
+                ? formData.bloodGroup
+                : undefined,
 
             adminCode:
               role === "admin"
@@ -234,6 +254,12 @@ function RegistrationForm({
           data.message ||
             "Registration failed."
         );
+        return;
+      }
+
+      // Patient registration
+      if (role === "patient" && data.patientId) {
+        setPatientId(data.patientId);
         return;
       }
 
@@ -256,6 +282,54 @@ function RegistrationForm({
     }
   }
 
+  // ================= PATIENT ID SUCCESS SCREEN =================
+
+  if (patientId) {
+    return (
+      <div className="mx-auto max-w-lg">
+        <div className="rounded-3xl border border-sky-100 bg-white p-8 text-center shadow-xl md:p-10">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-600">
+            <UserRound size={30} />
+          </div>
+
+          <p className="mt-6 text-sm font-semibold uppercase tracking-wider text-green-600">
+            Registration Successful
+          </p>
+
+          <h1 className="mt-2 text-3xl font-bold text-slate-900">
+            Welcome to Clinic-Chain
+          </h1>
+
+          <p className="mt-4 text-slate-500">
+            Your Patient ID has been created successfully.
+          </p>
+
+          <div className="mt-7 rounded-2xl bg-sky-50 p-6">
+            <p className="text-sm font-medium text-slate-500">
+              Your Patient ID
+            </p>
+
+            <p className="mt-2 text-3xl font-extrabold tracking-wider text-sky-600">
+              {patientId}
+            </p>
+          </div>
+
+          <p className="mt-5 text-sm text-slate-500">
+            Please save this Patient ID. You will need it
+            to access your medical records.
+          </p>
+
+          <button
+            onClick={() => router.push("/login")}
+            className="mt-7 w-full rounded-xl bg-sky-600 py-3.5 font-semibold text-white transition hover:bg-sky-700"
+          >
+            Continue to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-2xl">
       <button
@@ -267,26 +341,12 @@ function RegistrationForm({
       </button>
 
       <div className="rounded-3xl border border-sky-100 bg-white p-7 shadow-xl md:p-10">
-
-        {/* HEADER */}
-
         <div className="mb-8 flex items-center gap-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
-            {role === "doctor" && (
-              <Stethoscope size={27} />
-            )}
-
-            {role === "patient" && (
-              <UserRound size={27} />
-            )}
-
-            {role === "receptionist" && (
-              <Users size={27} />
-            )}
-
-            {role === "admin" && (
-              <ShieldCheck size={27} />
-            )}
+            {role === "doctor" && <Stethoscope size={27} />}
+            {role === "patient" && <UserRound size={27} />}
+            {role === "receptionist" && <Users size={27} />}
+            {role === "admin" && <ShieldCheck size={27} />}
           </div>
 
           <div>
@@ -304,9 +364,6 @@ function RegistrationForm({
           onSubmit={handleSubmit}
           className="space-y-5"
         >
-
-          {/* COMMON FIELDS */}
-
           <div className="grid gap-5 md:grid-cols-2">
             <Input
               name="fullName"
@@ -358,12 +415,9 @@ function RegistrationForm({
             />
           </div>
 
-          {/* PATIENT */}
-
           {role === "patient" && (
             <>
               <div className="grid gap-5 border-t border-sky-100 pt-5 md:grid-cols-2">
-
                 <Input
                   name="dateOfBirth"
                   label="Date of Birth"
@@ -416,11 +470,8 @@ function RegistrationForm({
             </>
           )}
 
-          {/* DOCTOR */}
-
           {role === "doctor" && (
             <div className="grid gap-5 border-t border-sky-100 pt-5 md:grid-cols-2">
-
               <Input
                 name="specialization"
                 label="Specialization"
@@ -456,8 +507,6 @@ function RegistrationForm({
             </div>
           )}
 
-          {/* RECEPTIONIST */}
-
           {role === "receptionist" && (
             <div className="border-t border-sky-100 pt-5">
               <Select
@@ -473,8 +522,6 @@ function RegistrationForm({
               />
             </div>
           )}
-
-          {/* ADMIN */}
 
           {role === "admin" && (
             <div className="border-t border-sky-100 pt-5">
@@ -494,8 +541,6 @@ function RegistrationForm({
             </div>
           )}
 
-          {/* TERMS */}
-
           <div className="flex items-start gap-3 rounded-xl bg-sky-50 p-4">
             <input
               type="checkbox"
@@ -504,12 +549,10 @@ function RegistrationForm({
             />
 
             <p className="text-xs leading-5 text-slate-600">
-              I agree to the Clinic-Chain terms
-              of service and privacy policy.
+              I agree to the Clinic-Chain terms of service
+              and privacy policy.
             </p>
           </div>
-
-          {/* BUTTON */}
 
           <button
             type="submit"
@@ -563,9 +606,7 @@ function Input({
         {label}
 
         {required && (
-          <span className="text-red-500">
-            {" "}*
-          </span>
+          <span className="text-red-500"> *</span>
         )}
       </label>
 
@@ -607,9 +648,7 @@ function Select({
         {label}
 
         {required && (
-          <span className="text-red-500">
-            {" "}*
-          </span>
+          <span className="text-red-500"> *</span>
         )}
       </label>
 
@@ -625,10 +664,7 @@ function Select({
         </option>
 
         {options.map((option) => (
-          <option
-            key={option}
-            value={option}
-          >
+          <option key={option} value={option}>
             {option}
           </option>
         ))}
