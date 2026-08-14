@@ -54,6 +54,11 @@ const MedicalHistorySchema = new Schema(
       default: "",
     },
 
+    treatment: {
+      type: String,
+      default: "",
+    },
+
     notes: {
       type: String,
       default: "",

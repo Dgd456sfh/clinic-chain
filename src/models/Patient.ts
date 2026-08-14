@@ -1,122 +1,300 @@
-import mongoose, { Schema, models } from "mongoose";
+import mongoose, {
+  Document,
+  Model,
+  Schema,
+} from "mongoose";
 
-const PatientSchema = new Schema(
-  {
-    patientId: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true,
-    },
+// ============================================================
+// MEDICAL PDF TYPE
+// ============================================================
 
-    fullName: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+export interface IMedicalPdf {
+  name: string;
+  path: string;
+  uploadedAt: Date;
 
-    dateOfBirth: {
-      type: Date,
-      required: true,
-    },
+  uploadedBy?: {
+    userId?: string;
+    name?: string;
+    role?: string;
+  };
+}
 
-    gender: {
-      type: String,
-      enum: ["Male", "Female", "Other"],
-      required: true,
-    },
+// ============================================================
+// PATIENT INTERFACE
+// ============================================================
 
-    phone: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+export interface IPatient extends Document {
+  patientId: string;
 
-    email: {
-      type: String,
-      lowercase: true,
-      trim: true,
-    },
+  fullName: string;
+  dateOfBirth?: Date;
+  gender?: string;
 
-    password: {
-      type: String,
-      required: true,
-    },
+  phone?: string;
+  email?: string;
+  address?: string;
 
-    address: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+  bloodGroup?: string;
 
-    bloodGroup: {
-      type: String,
-      default: "Unknown",
-    },
+  emergencyContact?: {
+    name?: string;
+    phone?: string;
+    relationship?: string;
+  };
 
-    emergencyContact: {
+  clinicId?: mongoose.Types.ObjectId;
+
+  // ==========================================================
+  // OLD SINGLE PDF FIELD
+  //
+  // Kept for backward compatibility with your existing code.
+  // The newest uploaded PDF is also stored here.
+  // ==========================================================
+
+  medicalPdf?: {
+    name?: string;
+    path?: string;
+  };
+
+  // ==========================================================
+  // NEW PDF HISTORY
+  //
+  // Every uploaded PDF is stored here.
+  // Old PDFs are NEVER replaced.
+  // ==========================================================
+
+  medicalPdfs: IMedicalPdf[];
+
+  // ==========================================================
+  // GENERAL MEDICAL NOTES
+  // ==========================================================
+
+  medicalNotes?: string;
+
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// ============================================================
+// MEDICAL PDF SCHEMA
+// ============================================================
+
+const MedicalPdfSchema =
+  new Schema<IMedicalPdf>(
+    {
       name: {
         type: String,
-        default: "",
-      },
-
-      phone: {
-        type: String,
-        default: "",
-      },
-
-      relationship: {
-        type: String,
-        default: "",
-      },
-    },
-
-    clinicId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Clinic",
-    },
-
-    medicalNotes: {
-      type: String,
-      default: "",
-    },
-
-    enteredBy: {
-      userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-
-      name: {
-        type: String,
-        default: "",
-      },
-
-      role: {
-        type: String,
-        default: "",
-      },
-    },
-
-    medicalPdf: {
-      name: {
-        type: String,
-        default: "",
+        required: true,
+        trim: true,
       },
 
       path: {
         type: String,
-        default: "",
+        required: true,
+        trim: true,
+      },
+
+      uploadedAt: {
+        type: Date,
+        default: Date.now,
+      },
+
+      uploadedBy: {
+        userId: {
+          type: String,
+          trim: true,
+        },
+
+        name: {
+          type: String,
+          trim: true,
+        },
+
+        role: {
+          type: String,
+          trim: true,
+        },
       },
     },
-  },
-  {
-    timestamps: true,
-  }
-);
+    {
+      _id: true,
+    }
+  );
 
-const Patient =
-  models.Patient ||
-  mongoose.model("Patient", PatientSchema);
+// ============================================================
+// PATIENT SCHEMA
+// ============================================================
+
+const PatientSchema =
+  new Schema<IPatient>(
+    {
+      // ========================================================
+      // PATIENT ID
+      // ========================================================
+
+      patientId: {
+        type: String,
+        required: true,
+        unique: true,
+        trim: true,
+        index: true,
+      },
+
+      // ========================================================
+      // BASIC DETAILS
+      // ========================================================
+
+      fullName: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+
+      dateOfBirth: {
+        type: Date,
+      },
+
+      gender: {
+        type: String,
+        trim: true,
+      },
+
+      // ========================================================
+      // CONTACT DETAILS
+      // ========================================================
+
+      phone: {
+        type: String,
+        trim: true,
+      },
+
+      email: {
+        type: String,
+        trim: true,
+        lowercase: true,
+      },
+
+      address: {
+        type: String,
+        trim: true,
+      },
+
+      // ========================================================
+      // BLOOD GROUP
+      // ========================================================
+
+      bloodGroup: {
+        type: String,
+        trim: true,
+      },
+
+      // ========================================================
+      // EMERGENCY CONTACT
+      // ========================================================
+
+      emergencyContact: {
+        name: {
+          type: String,
+          trim: true,
+        },
+
+        phone: {
+          type: String,
+          trim: true,
+        },
+
+        relationship: {
+          type: String,
+          trim: true,
+        },
+      },
+
+      // ========================================================
+      // CLINIC
+      // ========================================================
+
+      clinicId: {
+        type: Schema.Types.ObjectId,
+        ref: "Clinic",
+      },
+
+      // ========================================================
+      // OLD SINGLE PDF
+      //
+      // DO NOT REMOVE THIS.
+      //
+      // Existing parts of Clinic-Chain may still use:
+      //
+      // patient.medicalPdf.name
+      // patient.medicalPdf.path
+      //
+      // The newest PDF will continue to be stored here.
+      // ========================================================
+
+      medicalPdf: {
+        name: {
+          type: String,
+          trim: true,
+        },
+
+        path: {
+          type: String,
+          trim: true,
+        },
+      },
+
+      // ========================================================
+      // MEDICAL PDF HISTORY
+      //
+      // IMPORTANT:
+      //
+      // Every new PDF gets added to this array.
+      //
+      // Example:
+      //
+      // medicalPdfs: [
+      //   PDF 3,
+      //   PDF 2,
+      //   PDF 1
+      // ]
+      //
+      // No old PDF is overwritten.
+      // ========================================================
+
+      medicalPdfs: {
+        type: [MedicalPdfSchema],
+        default: [],
+      },
+
+      // ========================================================
+      // MEDICAL NOTES
+      // ========================================================
+
+      medicalNotes: {
+        type: String,
+        trim: true,
+      },
+    },
+
+    // ==========================================================
+    // AUTOMATIC CREATED / UPDATED DATES
+    // ==========================================================
+
+    {
+      timestamps: true,
+    }
+  );
+
+// ============================================================
+// PREVENT MODEL RE-COMPILATION IN NEXT.JS
+// ============================================================
+
+const Patient: Model<IPatient> =
+  mongoose.models.Patient ||
+  mongoose.model<IPatient>(
+    "Patient",
+    PatientSchema
+  );
 
 export default Patient;

@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 
+type TokenPayload = {
+  userId: string;
+  role: string;
+  email: string;
+  patientId?: string | null;
+};
+
 export async function GET() {
   try {
     const cookieStore = await cookies();
@@ -22,11 +29,7 @@ export async function GET() {
       token,
       process.env.JWT_SECRET ||
         "clinic_chain_secret_2026"
-    ) as {
-      userId: string;
-      role: string;
-      email: string;
-    };
+    ) as TokenPayload;
 
     return NextResponse.json({
       success: true,
@@ -35,16 +38,23 @@ export async function GET() {
         id: decoded.userId,
         role: decoded.role,
         email: decoded.email,
+
+        // IMPORTANT
+        // Patient ID comes from the JWT
+        patientId: decoded.patientId || null,
       },
     });
-
   } catch (error) {
-    console.error("Auth check error:", error);
+    console.error(
+      "Auth check error:",
+      error
+    );
 
     return NextResponse.json(
       {
         success: false,
-        message: "Invalid or expired session",
+        message:
+          "Invalid or expired session",
       },
       { status: 401 }
     );

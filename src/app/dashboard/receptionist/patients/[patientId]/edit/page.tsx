@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
+
 import {
   ArrowLeft,
   UserRound,
@@ -16,9 +17,35 @@ import {
   Upload,
   Save,
   Loader2,
+  Plus,
+  Trash2,
 } from "lucide-react";
 
+import type {
+  ChangeEvent,
+  FormEvent,
+  ReactNode,
+} from "react";
+
+// ============================================================
+// TYPES
+// ============================================================
+
+type MedicalPdf = {
+  name?: string;
+  path?: string;
+  uploadedAt?: string;
+
+  uploadedBy?: {
+    userId?: string;
+    name?: string;
+    role?: string;
+  };
+};
+
 type Patient = {
+  _id?: string;
+
   patientId: string;
   fullName: string;
   dateOfBirth: string;
@@ -36,130 +63,470 @@ type Patient = {
 
   medicalNotes?: string;
 
-  medicalPdf?: {
+  // Old PDF
+  medicalPdf?: MedicalPdf;
+
+  // New PDF history
+  medicalPdfs?: MedicalPdf[];
+};
+
+type MedicalHistoryRecord = {
+  _id?: string;
+
+  patientId?: string;
+  patientCode?: string;
+
+  doctorName?: string;
+  diagnosis?: string;
+  prescription?: string;
+  treatment?: string;
+  notes?: string;
+
+  visitDate?: string;
+  date?: string;
+
+  createdAt?: string;
+  updatedAt?: string;
+
+  enteredBy?: {
+    userId?: string;
     name?: string;
-    path?: string;
+    role?: string;
   };
 };
 
+// ============================================================
+// PAGE
+// ============================================================
+
 export default function EditPatientPage() {
   const params = useParams();
-  const router = useRouter();
 
-  const patientId = String(params.patientId);
+  const patientId = String(params.patientId || "");
 
-  const [patient, setPatient] = useState<Patient | null>(null);
+  // ============================================================
+  // PATIENT
+  // ============================================================
 
-  const [fullName, setFullName] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-  const [gender, setGender] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [address, setAddress] = useState("");
-  const [bloodGroup, setBloodGroup] = useState("");
+  const [patient, setPatient] =
+    useState<Patient | null>(null);
 
-  const [emergencyName, setEmergencyName] = useState("");
-  const [emergencyPhone, setEmergencyPhone] = useState("");
-  const [emergencyRelationship, setEmergencyRelationship] =
+  const [fullName, setFullName] =
     useState("");
 
-  const [medicalNotes, setMedicalNotes] = useState("");
+  const [dateOfBirth, setDateOfBirth] =
+    useState("");
 
-  const [pdfName, setPdfName] = useState("");
-  const [pdfUploading, setPdfUploading] = useState(false);
+  const [gender, setGender] =
+    useState("");
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [phone, setPhone] =
+    useState("");
+
+  const [email, setEmail] =
+    useState("");
+
+  const [address, setAddress] =
+    useState("");
+
+  const [bloodGroup, setBloodGroup] =
+    useState("");
+
+  const [emergencyName, setEmergencyName] =
+    useState("");
+
+  const [emergencyPhone, setEmergencyPhone] =
+    useState("");
+
+  const [
+    emergencyRelationship,
+    setEmergencyRelationship,
+  ] = useState("");
+
+  const [medicalNotes, setMedicalNotes] =
+    useState("");
+
+  // ============================================================
+  // PDF
+  // ============================================================
+
+  const [pdfUploading, setPdfUploading] =
+    useState(false);
+
+  // ============================================================
+  // MEDICAL HISTORY
+  // ============================================================
+
+  const [history, setHistory] =
+    useState<MedicalHistoryRecord[]>([]);
+
+  const [doctorName, setDoctorName] =
+    useState("");
+
+  const [diagnosis, setDiagnosis] =
+    useState("");
+
+  const [prescription, setPrescription] =
+    useState("");
+
+  const [historyNotes, setHistoryNotes] =
+    useState("");
+
+  const [visitDate, setVisitDate] =
+    useState(
+      new Date()
+        .toISOString()
+        .split("T")[0]
+    );
+
+  const [addingHistory, setAddingHistory] =
+    useState(false);
+
+  const [
+    deletingHistoryId,
+    setDeletingHistoryId,
+  ] = useState<string | null>(null);
+
+  // ============================================================
+  // PAGE STATE
+  // ============================================================
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [message, setMessage] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
 
   // ============================================================
   // LOAD PATIENT
   // ============================================================
 
   useEffect(() => {
-    async function loadPatient() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const response = await fetch(
-          `/api/patients/${encodeURIComponent(patientId)}`,
-          {
-            method: "GET",
-            cache: "no-store",
-          }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.message || "Unable to load patient."
-          );
-        }
-
-        const p: Patient = data.patient || data;
-
-        setPatient(p);
-
-        setFullName(p.fullName || "");
-
-        setDateOfBirth(
-          p.dateOfBirth
-            ? new Date(p.dateOfBirth)
-                .toISOString()
-                .split("T")[0]
-            : ""
-        );
-
-        setGender(p.gender || "");
-        setPhone(p.phone || "");
-        setEmail(p.email || "");
-        setAddress(p.address || "");
-        setBloodGroup(p.bloodGroup || "");
-
-        setEmergencyName(
-          p.emergencyContact?.name || ""
-        );
-
-        setEmergencyPhone(
-          p.emergencyContact?.phone || ""
-        );
-
-        setEmergencyRelationship(
-          p.emergencyContact?.relationship || ""
-        );
-
-        setMedicalNotes(p.medicalNotes || "");
-
-        setPdfName(
-          p.medicalPdf?.name || ""
-        );
-      } catch (err) {
-        console.error(err);
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load patient."
-        );
-      } finally {
-        setLoading(false);
-      }
+    if (!patientId) {
+      return;
     }
 
-    if (patientId) {
-      loadPatient();
-    }
+    loadPatient();
+    loadMedicalHistory();
+    loadMedicalPdfs();
   }, [patientId]);
 
   // ============================================================
-  // SAVE PATIENT DETAILS
+  // LOAD PATIENT
+  // ============================================================
+
+  async function loadPatient() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await fetch(
+        `/api/patients/${encodeURIComponent(
+          patientId
+        )}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      const responseText =
+        await response.text();
+
+      let data: {
+        success?: boolean;
+        message?: string;
+        patient?: Patient;
+      } = {};
+
+      if (responseText.trim()) {
+        try {
+          data = JSON.parse(
+            responseText
+          );
+        } catch {
+          throw new Error(
+            "Server returned an invalid patient response."
+          );
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            `Unable to load patient. HTTP ${response.status}.`
+        );
+      }
+
+      const loadedPatient =
+        data.patient;
+
+      if (!loadedPatient) {
+        throw new Error(
+          "Patient data was not returned by the server."
+        );
+      }
+
+      setPatient(
+        loadedPatient
+      );
+
+      setFullName(
+        loadedPatient.fullName || ""
+      );
+
+      setDateOfBirth(
+        loadedPatient.dateOfBirth
+          ? new Date(
+              loadedPatient.dateOfBirth
+            )
+              .toISOString()
+              .split("T")[0]
+          : ""
+      );
+
+      setGender(
+        loadedPatient.gender || ""
+      );
+
+      setPhone(
+        loadedPatient.phone || ""
+      );
+
+      setEmail(
+        loadedPatient.email || ""
+      );
+
+      setAddress(
+        loadedPatient.address || ""
+      );
+
+      setBloodGroup(
+        loadedPatient.bloodGroup || ""
+      );
+
+      setEmergencyName(
+        loadedPatient
+          .emergencyContact
+          ?.name || ""
+      );
+
+      setEmergencyPhone(
+        loadedPatient
+          .emergencyContact
+          ?.phone || ""
+      );
+
+      setEmergencyRelationship(
+        loadedPatient
+          .emergencyContact
+          ?.relationship || ""
+      );
+
+      setMedicalNotes(
+        loadedPatient.medicalNotes || ""
+      );
+    } catch (err) {
+      console.error(
+        "Load patient error:",
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load patient."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ============================================================
+  // LOAD MEDICAL HISTORY
+  // ============================================================
+
+  async function loadMedicalHistory() {
+    try {
+      const response = await fetch(
+        `/api/medical-history?patientId=${encodeURIComponent(
+          patientId
+        )}`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      const responseText =
+        await response.text();
+
+      let data: {
+        success?: boolean;
+        message?: string;
+        history?: MedicalHistoryRecord[];
+      } = {};
+
+      if (responseText.trim()) {
+        try {
+          data = JSON.parse(
+            responseText
+          );
+        } catch {
+          throw new Error(
+            "Server returned an invalid medical history response."
+          );
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            `Failed to load medical history. HTTP ${response.status}.`
+        );
+      }
+
+      setHistory(
+        data.history || []
+      );
+    } catch (err) {
+      console.error(
+        "Load medical history error:",
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load medical history."
+      );
+    }
+  }
+
+  // ============================================================
+  // LOAD ALL MEDICAL PDFs
+  // ============================================================
+
+  async function loadMedicalPdfs() {
+    try {
+      const response = await fetch(
+        `/api/patients/${encodeURIComponent(
+          patientId
+        )}/pdf`,
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      const responseText =
+        await response.text();
+
+      let data: {
+        success?: boolean;
+        message?: string;
+        medicalPdfs?: MedicalPdf[];
+        medicalPdf?: MedicalPdf;
+      } = {};
+
+      if (responseText.trim()) {
+        try {
+          data = JSON.parse(
+            responseText
+          );
+        } catch {
+          throw new Error(
+            "Server returned an invalid PDF response."
+          );
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            `Failed to load medical PDFs. HTTP ${response.status}.`
+        );
+      }
+
+      let pdfs =
+        data.medicalPdfs || [];
+
+      // ========================================================
+      // BACKWARD COMPATIBILITY
+      // ========================================================
+
+      if (
+        pdfs.length === 0 &&
+        data.medicalPdf?.path
+      ) {
+        pdfs = [
+          data.medicalPdf,
+        ];
+      }
+
+      // ========================================================
+      // SORT NEWEST FIRST
+      // ========================================================
+
+      pdfs.sort(
+        (a, b) => {
+          const aTime =
+            a.uploadedAt
+              ? new Date(
+                  a.uploadedAt
+                ).getTime()
+              : 0;
+
+          const bTime =
+            b.uploadedAt
+              ? new Date(
+                  b.uploadedAt
+                ).getTime()
+              : 0;
+
+          return bTime - aTime;
+        }
+      );
+
+      setPatient(
+        (previous) =>
+          previous
+            ? {
+                ...previous,
+                medicalPdfs:
+                  pdfs,
+                medicalPdf:
+                  pdfs[0] ||
+                  previous.medicalPdf,
+              }
+            : previous
+      );
+    } catch (err) {
+      console.error(
+        "Load medical PDFs error:",
+        err
+      );
+
+      // Don't destroy the whole page if
+      // the PDF endpoint has a problem.
+      console.warn(
+        "PDF history could not be loaded."
+      );
+    }
+  }
+
+  // ============================================================
+  // SAVE PATIENT
   // ============================================================
 
   async function handleSave(
-    event: React.FormEvent<HTMLFormElement>
+    event: FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
 
@@ -169,12 +536,17 @@ export default function EditPatientPage() {
       setError("");
 
       const response = await fetch(
-        `/api/patients/${encodeURIComponent(patientId)}`,
+        `/api/patients/${encodeURIComponent(
+          patientId
+        )}`,
         {
           method: "PUT",
+
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
+
           body: JSON.stringify({
             fullName,
             dateOfBirth,
@@ -187,7 +559,8 @@ export default function EditPatientPage() {
             emergencyContact: {
               name: emergencyName,
               phone: emergencyPhone,
-              relationship: emergencyRelationship,
+              relationship:
+                emergencyRelationship,
             },
 
             medicalNotes,
@@ -195,21 +568,52 @@ export default function EditPatientPage() {
         }
       );
 
-      const data = await response.json();
+      const responseText =
+        await response.text();
+
+      let data: {
+        success?: boolean;
+        message?: string;
+        patient?: Patient;
+      } = {};
+
+      if (responseText.trim()) {
+        try {
+          data = JSON.parse(
+            responseText
+          );
+        } catch {
+          throw new Error(
+            `Server returned an invalid response. HTTP ${response.status}.`
+          );
+        }
+      }
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Failed to update patient."
+          data.message ||
+            `Failed to update patient. HTTP ${response.status}.`
         );
       }
 
-      setPatient(data.patient || patient);
+      if (data.patient) {
+        setPatient(
+          (previous) =>
+            ({
+              ...previous,
+              ...data.patient,
+            }) as Patient
+        );
+      }
 
       setMessage(
         "Patient details updated successfully."
       );
     } catch (err) {
-      console.error(err);
+      console.error(
+        "Update patient error:",
+        err
+      );
 
       setError(
         err instanceof Error
@@ -222,64 +626,362 @@ export default function EditPatientPage() {
   }
 
   // ============================================================
+  // ADD MEDICAL HISTORY
+  // ============================================================
+
+  async function handleAddMedicalHistory() {
+    if (
+      !diagnosis.trim() &&
+      !prescription.trim() &&
+      !historyNotes.trim()
+    ) {
+      setError(
+        "Please enter at least a diagnosis, prescription, or visit note."
+      );
+
+      return;
+    }
+
+    try {
+      setAddingHistory(true);
+
+      setMessage("");
+      setError("");
+
+      const response = await fetch(
+        "/api/medical-history",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            patientId,
+
+            patientCode:
+              patient?.patientId ||
+              patientId,
+
+            doctorName:
+              doctorName.trim(),
+
+            diagnosis:
+              diagnosis.trim(),
+
+            prescription:
+              prescription.trim(),
+
+            notes:
+              historyNotes.trim(),
+
+            visitDate,
+          }),
+        }
+      );
+
+      const responseText =
+        await response.text();
+
+      let data: {
+        success?: boolean;
+        message?: string;
+        history?: MedicalHistoryRecord;
+      } = {};
+
+      if (responseText.trim()) {
+        try {
+          data = JSON.parse(
+            responseText
+          );
+        } catch {
+          throw new Error(
+            `Server returned an invalid response. HTTP ${response.status}.`
+          );
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            `Failed to add medical visit. HTTP ${response.status}.`
+        );
+      }
+
+      if (data.history) {
+        setHistory(
+          (previous) => [
+            data.history!,
+            ...previous,
+          ]
+        );
+      } else {
+        await loadMedicalHistory();
+      }
+
+      setDoctorName("");
+      setDiagnosis("");
+      setPrescription("");
+      setHistoryNotes("");
+
+      setVisitDate(
+        new Date()
+          .toISOString()
+          .split("T")[0]
+      );
+
+      setMessage(
+        "Medical visit added successfully. Previous visits were preserved."
+      );
+    } catch (err) {
+      console.error(
+        "Add medical history error:",
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to add medical visit."
+      );
+    } finally {
+      setAddingHistory(false);
+    }
+  }
+
+  // ============================================================
+  // DELETE MEDICAL HISTORY
+  // ============================================================
+
+  async function handleDeleteMedicalHistory(
+    historyId: string
+  ) {
+    const confirmed =
+      window.confirm(
+        "Are you sure you want to delete this medical visit?"
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingHistoryId(
+        historyId
+      );
+
+      setMessage("");
+      setError("");
+
+      const response = await fetch(
+        `/api/medical-history?id=${encodeURIComponent(
+          historyId
+        )}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const responseText =
+        await response.text();
+
+      let data: {
+        success?: boolean;
+        message?: string;
+      } = {};
+
+      if (responseText.trim()) {
+        try {
+          data = JSON.parse(
+            responseText
+          );
+        } catch {
+          throw new Error(
+            `Server returned an invalid response. HTTP ${response.status}.`
+          );
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            `Failed to delete medical visit. HTTP ${response.status}.`
+        );
+      }
+
+      setHistory(
+        (previous) =>
+          previous.filter(
+            (record) =>
+              record._id !==
+              historyId
+          )
+      );
+
+      setMessage(
+        "Medical visit deleted successfully."
+      );
+    } catch (err) {
+      console.error(
+        "Delete medical history error:",
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to delete medical visit."
+      );
+    } finally {
+      setDeletingHistoryId(
+        null
+      );
+    }
+  }
+
+  // ============================================================
   // PDF UPLOAD
   // ============================================================
 
   async function handlePdfUpload(
-    event: React.ChangeEvent<HTMLInputElement>
+    event: ChangeEvent<HTMLInputElement>
   ) {
-    const file = event.target.files?.[0];
+    const file =
+      event.target.files?.[0];
 
     if (!file) {
       return;
     }
 
-    if (file.type !== "application/pdf") {
-      alert("Only PDF files are allowed.");
+    if (
+      file.type !==
+      "application/pdf"
+    ) {
+      alert(
+        "Only PDF files are allowed."
+      );
+
       event.target.value = "";
+
       return;
     }
 
-    // Optional 10 MB limit
-    const maxSize = 10 * 1024 * 1024;
+    const maxSize =
+      10 * 1024 * 1024;
 
     if (file.size > maxSize) {
-      alert("PDF must be smaller than 10 MB.");
+      alert(
+        "PDF must be smaller than 10 MB."
+      );
+
       event.target.value = "";
+
       return;
     }
 
     try {
       setPdfUploading(true);
+
       setError("");
       setMessage("");
 
-      const formData = new FormData();
+      const formData =
+        new FormData();
 
-      formData.append("file", file);
-
-      const response = await fetch(
-        `/api/patients/${encodeURIComponent(patientId)}/pdf`,
-        {
-          method: "POST",
-          body: formData,
-        }
+      formData.append(
+        "file",
+        file
       );
 
-      const data = await response.json();
+      const response =
+        await fetch(
+          `/api/patients/${encodeURIComponent(
+            patientId
+          )}/pdf`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+
+      const responseText =
+        await response.text();
+
+      let data: {
+        success?: boolean;
+        message?: string;
+        pdfName?: string;
+
+        medicalPdf?: MedicalPdf;
+
+        medicalPdfs?: MedicalPdf[];
+      } = {};
+
+      if (responseText.trim()) {
+        try {
+          data =
+            JSON.parse(
+              responseText
+            );
+        } catch {
+          throw new Error(
+            "Server returned an invalid response while uploading the PDF."
+          );
+        }
+      }
 
       if (!response.ok) {
         throw new Error(
           data.message ||
-            "Failed to upload medical PDF."
+            `Failed to upload medical PDF. HTTP ${response.status}.`
         );
       }
 
-      setPdfName(
-        data.pdfName ||
-          data.medicalPdf?.name ||
-          file.name
+      const uploadedPdf: MedicalPdf =
+        data.medicalPdf || {
+          name:
+            data.pdfName ||
+            file.name,
+        };
+
+      // ========================================================
+      // UPDATE LOCAL PDF LIST
+      // ========================================================
+
+      setPatient(
+        (previous) => {
+          if (!previous) {
+            return previous;
+          }
+
+          const existingPdfs =
+            previous.medicalPdfs ||
+            [];
+
+          const updatedPdfs = [
+            uploadedPdf,
+            ...existingPdfs,
+          ];
+
+          return {
+            ...previous,
+
+            medicalPdfs:
+              updatedPdfs,
+
+            medicalPdf:
+              uploadedPdf,
+          };
+        }
       );
+
+      // ========================================================
+      // RELOAD FROM SERVER
+      // ========================================================
+
+      await loadMedicalPdfs();
 
       setMessage(
         "Medical PDF uploaded successfully."
@@ -298,9 +1000,40 @@ export default function EditPatientPage() {
     } finally {
       setPdfUploading(false);
 
-      // Allows selecting the same file again
       event.target.value = "";
     }
+  }
+
+  // ============================================================
+  // FORMAT DATE
+  // ============================================================
+
+  function formatDate(
+    date?: string
+  ) {
+    if (!date) {
+      return "Not available";
+    }
+
+    const parsedDate =
+      new Date(date);
+
+    if (
+      Number.isNaN(
+        parsedDate.getTime()
+      )
+    ) {
+      return "Not available";
+    }
+
+    return parsedDate.toLocaleDateString(
+      "en-IN",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    );
   }
 
   // ============================================================
@@ -325,7 +1058,7 @@ export default function EditPatientPage() {
   }
 
   // ============================================================
-  // ERROR
+  // PATIENT NOT FOUND
   // ============================================================
 
   if (!patient) {
@@ -355,7 +1088,8 @@ export default function EditPatientPage() {
         <section className="mx-auto max-w-5xl px-6 py-10">
           <div className="rounded-3xl border border-red-100 bg-white p-8 shadow-sm">
             <p className="font-semibold text-red-600">
-              {error || "Patient not found."}
+              {error ||
+                "Patient not found."}
             </p>
           </div>
         </section>
@@ -364,12 +1098,22 @@ export default function EditPatientPage() {
   }
 
   // ============================================================
+  // PDF LIST
+  // ============================================================
+
+  const medicalPdfs =
+    patient.medicalPdfs ||
+    [];
+
+  // ============================================================
   // PAGE
   // ============================================================
 
   return (
     <main className="min-h-screen bg-sky-50">
-      {/* HEADER */}
+      {/* ========================================================
+          HEADER
+      ======================================================== */}
 
       <header className="border-b border-sky-100 bg-white">
         <div className="mx-auto flex max-w-5xl items-center gap-4 px-6 py-5">
@@ -390,16 +1134,19 @@ export default function EditPatientPage() {
             </h1>
 
             <p className="mt-1 text-sm text-slate-500">
-              Patient ID: {patient.patientId}
+              Patient ID:{" "}
+              {patient.patientId}
             </p>
           </div>
         </div>
       </header>
 
-      {/* CONTENT */}
+      {/* ========================================================
+          CONTENT
+      ======================================================== */}
 
       <section className="mx-auto max-w-5xl px-6 py-10">
-        {/* SUCCESS MESSAGE */}
+        {/* SUCCESS */}
 
         {message && (
           <div className="mb-5 rounded-2xl border border-green-100 bg-green-50 p-4 text-sm font-medium text-green-700">
@@ -407,7 +1154,7 @@ export default function EditPatientPage() {
           </div>
         )}
 
-        {/* ERROR MESSAGE */}
+        {/* ERROR */}
 
         {error && (
           <div className="mb-5 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-medium text-red-600">
@@ -415,11 +1162,15 @@ export default function EditPatientPage() {
           </div>
         )}
 
-        {/* PATIENT FORM */}
+        {/* ======================================================
+            MAIN FORM
+        ====================================================== */}
 
         <form onSubmit={handleSave}>
           <div className="overflow-hidden rounded-3xl border border-sky-100 bg-white shadow-sm">
-            {/* PATIENT HEADER */}
+            {/* ==================================================
+                PATIENT HEADER
+            ================================================== */}
 
             <div className="bg-sky-50 p-7">
               <div className="flex items-center gap-4">
@@ -443,7 +1194,9 @@ export default function EditPatientPage() {
               </div>
             </div>
 
-            {/* PERSONAL INFORMATION */}
+            {/* ==================================================
+                PERSONAL INFORMATION
+            ================================================== */}
 
             <div className="border-b border-slate-100 p-7">
               <SectionTitle
@@ -492,7 +1245,9 @@ export default function EditPatientPage() {
                   <select
                     value={gender}
                     onChange={(event) =>
-                      setGender(event.target.value)
+                      setGender(
+                        event.target.value
+                      )
                     }
                     required
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
@@ -576,7 +1331,9 @@ export default function EditPatientPage() {
               </div>
             </div>
 
-            {/* CONTACT INFORMATION */}
+            {/* ==================================================
+                CONTACT
+            ================================================== */}
 
             <div className="border-b border-slate-100 p-7">
               <SectionTitle
@@ -613,7 +1370,9 @@ export default function EditPatientPage() {
               </div>
             </div>
 
-            {/* EMERGENCY CONTACT */}
+            {/* ==================================================
+                EMERGENCY
+            ================================================== */}
 
             <div className="border-b border-slate-100 p-7">
               <SectionTitle
@@ -637,12 +1396,16 @@ export default function EditPatientPage() {
                 <InputField
                   label="Relationship"
                   value={emergencyRelationship}
-                  onChange={setEmergencyRelationship}
+                  onChange={
+                    setEmergencyRelationship
+                  }
                 />
               </div>
             </div>
 
-            {/* MEDICAL NOTES */}
+            {/* ==================================================
+                MEDICAL NOTES
+            ================================================== */}
 
             <div className="border-b border-slate-100 p-7">
               <SectionTitle
@@ -669,7 +1432,269 @@ export default function EditPatientPage() {
               </div>
             </div>
 
-            {/* MEDICAL PDF */}
+            {/* ==================================================
+                ADD MEDICAL VISIT
+            ================================================== */}
+
+            <div className="border-b border-slate-100 p-7">
+              <SectionTitle
+                icon={<Plus size={19} />}
+                title="Add Medical Visit"
+              />
+
+              <p className="mt-2 text-sm text-slate-500">
+                Add a new consultation without
+                deleting previous medical history.
+              </p>
+
+              <div className="mt-6 rounded-2xl border border-sky-100 bg-sky-50 p-6">
+                <div className="grid gap-5 md:grid-cols-2">
+                  <InputField
+                    label="Doctor Name"
+                    value={doctorName}
+                    onChange={setDoctorName}
+                    placeholder="e.g. Dr. Sharma"
+                  />
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                      Visit Date
+                    </label>
+
+                    <div className="relative">
+                      <Calendar
+                        size={18}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+
+                      <input
+                        type="date"
+                        value={visitDate}
+                        onChange={(event) =>
+                          setVisitDate(
+                            event.target.value
+                          )
+                        }
+                        className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <InputField
+                      label="Diagnosis"
+                      value={diagnosis}
+                      onChange={setDiagnosis}
+                      placeholder="e.g. Fever and viral infection"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                      Prescription / Treatment
+                    </label>
+
+                    <textarea
+                      value={prescription}
+                      onChange={(event) =>
+                        setPrescription(
+                          event.target.value
+                        )
+                      }
+                      rows={3}
+                      placeholder="e.g. Paracetamol 500mg twice daily"
+                      className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
+                      Visit Notes
+                    </label>
+
+                    <textarea
+                      value={historyNotes}
+                      onChange={(event) =>
+                        setHistoryNotes(
+                          event.target.value
+                        )
+                      }
+                      rows={3}
+                      placeholder="e.g. Follow-up after 3 days"
+                      className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-5">
+                  <button
+                    type="button"
+                    onClick={
+                      handleAddMedicalHistory
+                    }
+                    disabled={addingHistory}
+                    className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {addingHistory ? (
+                      <>
+                        <Loader2
+                          size={17}
+                          className="animate-spin"
+                        />
+                        Adding Visit...
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={17} />
+                        Add Medical Visit
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ==================================================
+                PREVIOUS MEDICAL HISTORY
+            ================================================== */}
+
+            <div className="border-b border-slate-100 p-7">
+              <SectionTitle
+                icon={<HeartPulse size={19} />}
+                title="Previous Medical History"
+              />
+
+              <p className="mt-2 text-sm text-slate-500">
+                All previous medical visits are
+                preserved here.
+              </p>
+
+              {history.length === 0 ? (
+                <div className="mt-6 rounded-2xl border border-dashed border-slate-200 p-8 text-center">
+                  <HeartPulse
+                    size={40}
+                    className="mx-auto text-slate-300"
+                  />
+
+                  <p className="mt-3 text-sm font-semibold text-slate-600">
+                    No medical visits recorded yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-6 space-y-4">
+                  {history.map(
+                    (record, index) => (
+                      <div
+                        key={
+                          record._id ||
+                          `${record.visitDate}-${index}`
+                        }
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                      >
+                        <div className="flex flex-col justify-between gap-3 md:flex-row">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-sky-600">
+                              Medical Visit
+                            </p>
+
+                            <h3 className="mt-1 text-lg font-bold text-slate-900">
+                              {record.diagnosis ||
+                                "Medical consultation"}
+                            </h3>
+                          </div>
+
+                          <div className="flex items-start gap-3">
+                            <p className="text-sm text-slate-500">
+                              {formatDate(
+                                record.visitDate ||
+                                  record.date ||
+                                  record.createdAt
+                              )}
+                            </p>
+
+                            {record._id && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteMedicalHistory(
+                                    record._id!
+                                  )
+                                }
+                                disabled={
+                                  deletingHistoryId ===
+                                  record._id
+                                }
+                                className="rounded-lg p-2 text-red-500 transition hover:bg-red-50 disabled:opacity-50"
+                                title="Delete visit"
+                              >
+                                {deletingHistoryId ===
+                                record._id ? (
+                                  <Loader2
+                                    size={17}
+                                    className="animate-spin"
+                                  />
+                                ) : (
+                                  <Trash2
+                                    size={17}
+                                  />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {record.doctorName && (
+                          <p className="mt-4 text-sm text-slate-600">
+                            <span className="font-semibold">
+                              Doctor:
+                            </span>{" "}
+                            {record.doctorName}
+                          </p>
+                        )}
+
+                        {record.prescription && (
+                          <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">
+                            <span className="font-semibold">
+                              Prescription:
+                            </span>{" "}
+                            {record.prescription}
+                          </p>
+                        )}
+
+                        {record.treatment && (
+                          <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">
+                            <span className="font-semibold">
+                              Treatment:
+                            </span>{" "}
+                            {record.treatment}
+                          </p>
+                        )}
+
+                        {record.notes && (
+                          <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">
+                            <span className="font-semibold">
+                              Notes:
+                            </span>{" "}
+                            {record.notes}
+                          </p>
+                        )}
+
+                        {record.enteredBy?.name && (
+                          <p className="mt-4 border-t border-slate-200 pt-3 text-xs text-slate-400">
+                            Added by{" "}
+                            {record.enteredBy.name}
+                          </p>
+                        )}
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ==================================================
+                MEDICAL DOCUMENTS
+            ================================================== */}
 
             <div className="border-b border-slate-100 p-7">
               <SectionTitle
@@ -678,6 +1703,8 @@ export default function EditPatientPage() {
               />
 
               <div className="mt-6 rounded-2xl border border-dashed border-sky-200 bg-sky-50 p-6">
+                {/* UPLOAD */}
+
                 <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
                   <div className="flex items-start gap-4">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600 shadow-sm">
@@ -686,18 +1713,19 @@ export default function EditPatientPage() {
 
                     <div>
                       <p className="font-semibold text-slate-800">
-                        Medical History PDF
+                        Medical History PDFs
                       </p>
 
-                      {pdfName ? (
-                        <p className="mt-1 break-all text-sm text-slate-500">
-                          Current file: {pdfName}
-                        </p>
-                      ) : (
-                        <p className="mt-1 text-sm text-slate-500">
-                          No medical PDF uploaded yet.
-                        </p>
-                      )}
+                      <p className="mt-1 text-sm text-slate-500">
+                        {medicalPdfs.length > 0
+                          ? `${medicalPdfs.length} medical document${
+                              medicalPdfs.length !==
+                              1
+                                ? "s"
+                                : ""
+                            } stored`
+                          : "No medical PDFs uploaded yet."}
+                      </p>
 
                       <p className="mt-2 text-xs text-slate-400">
                         PDF only • Maximum 10 MB
@@ -719,54 +1747,131 @@ export default function EditPatientPage() {
                       <>
                         <Upload size={17} />
 
-                        {pdfName
-                          ? "Replace PDF"
-                          : "Upload PDF"}
+                        Upload New PDF
                       </>
                     )}
 
                     <input
                       type="file"
                       accept="application/pdf,.pdf"
-                      onChange={handlePdfUpload}
+                      onChange={
+                        handlePdfUpload
+                      }
                       disabled={pdfUploading}
                       className="hidden"
                     />
                   </label>
                 </div>
 
-                {/* VIEW CURRENT PDF */}
+                {/* ==================================================
+                    PDF HISTORY
+                ================================================== */}
 
-                {patient.medicalPdf?.path && (
-                  <div className="mt-5 flex flex-wrap gap-3 border-t border-sky-100 pt-5">
-                    <a
-                      href={`/api/patients/${encodeURIComponent(
-                        patientId
-                      )}/pdf`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-sky-600 shadow-sm transition hover:bg-sky-100"
-                    >
-                      <FileText size={17} />
+                {medicalPdfs.length > 0 ? (
+                  <div className="mt-6 space-y-3 border-t border-sky-100 pt-5">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-slate-700">
+                        Document History
+                      </p>
 
-                      View Medical PDF
-                    </a>
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-sky-600">
+                        {medicalPdfs.length}{" "}
+                        document
+                        {medicalPdfs.length !==
+                        1
+                          ? "s"
+                          : ""}
+                      </span>
+                    </div>
 
-                    <a
-                      href={`/api/patients/${encodeURIComponent(
-                        patientId
-                      )}/pdf`}
-                      download
-                      className="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-white px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-sky-50"
-                    >
-                      Download PDF
-                    </a>
+                    {medicalPdfs.map(
+                      (pdf, index) => (
+                        <div
+                          key={`${pdf.path}-${index}`}
+                          className="flex flex-col gap-4 rounded-2xl border border-sky-100 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+                              <FileText
+                                size={19}
+                              />
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="break-all text-sm font-semibold text-slate-800">
+                                {pdf.name ||
+                                  "Medical Document"}
+                              </p>
+
+                              {pdf.uploadedAt && (
+                                <p className="mt-1 text-xs text-slate-400">
+                                  Uploaded{" "}
+                                  {formatDate(
+                                    pdf.uploadedAt
+                                  )}
+                                </p>
+                              )}
+
+                              {pdf.uploadedBy
+                                ?.name && (
+                                <p className="mt-1 text-xs text-slate-400">
+                                  Uploaded by{" "}
+                                  {
+                                    pdf
+                                      .uploadedBy
+                                      .name
+                                  }
+                                </p>
+                              )}
+
+                              {index === 0 && (
+                                <span className="mt-2 inline-block rounded-full bg-green-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-green-700">
+                                  Latest
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {pdf.path && (
+                            <a
+                              href={
+                                pdf.path
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="shrink-0 rounded-xl bg-sky-600 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-sky-700"
+                            >
+                              View PDF
+                            </a>
+                          )}
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-white p-7 text-center">
+                    <FileText
+                      size={35}
+                      className="mx-auto text-slate-300"
+                    />
+
+                    <p className="mt-3 text-sm font-semibold text-slate-600">
+                      No medical documents
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-400">
+                      Upload a PDF to add it to
+                      the patient's medical
+                      document history.
+                    </p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* SAVE */}
+            {/* ==================================================
+                SAVE
+            ================================================== */}
 
             <div className="flex flex-col gap-3 bg-slate-50 p-7 sm:flex-row sm:justify-between">
               <Link
@@ -816,7 +1921,7 @@ function SectionTitle({
   icon,
   title,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   title: string;
 }) {
   return (
@@ -843,13 +1948,23 @@ function InputField({
   required = false,
   type = "text",
   icon,
+  placeholder,
 }: {
   label: string;
+
   value: string;
-  onChange: (value: string) => void;
+
+  onChange: (
+    value: string
+  ) => void;
+
   required?: boolean;
+
   type?: string;
-  icon?: React.ReactNode;
+
+  icon?: ReactNode;
+
+  placeholder?: string;
 }) {
   return (
     <div>
@@ -874,11 +1989,16 @@ function InputField({
           type={type}
           value={value}
           onChange={(event) =>
-            onChange(event.target.value)
+            onChange(
+              event.target.value
+            )
           }
           required={required}
+          placeholder={placeholder}
           className={`w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pr-4 text-sm outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 ${
-            icon ? "pl-11" : "pl-4"
+            icon
+              ? "pl-11"
+              : "pl-4"
           }`}
         />
       </div>

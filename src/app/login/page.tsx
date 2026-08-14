@@ -9,7 +9,6 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -27,69 +26,117 @@ export default function LoginPage() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
-          email,
+          email: email.trim().toLowerCase(),
           password,
         }),
       });
 
-      const data = await response.json();
+      const text = await response.text();
+
+      let data: any = {};
+
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        console.error(
+          "Login API returned invalid JSON:",
+          text
+        );
+
+        throw new Error(
+          `Server returned an invalid response (${response.status}).`
+        );
+      }
 
       if (!response.ok) {
         setError(
-          data.message || "Login failed."
+          data.message ||
+            `Login failed (${response.status}).`
         );
         return;
       }
 
-      /* ROLE BASED REDIRECT */
+      if (!data.success || !data.user) {
+        setError(
+          data.message ||
+            "Login response was incomplete."
+        );
+        return;
+      }
+
+      /*
+       * Save complete login information.
+       * Patient dashboard uses patientId from here.
+       */
+      localStorage.setItem(
+        "user",
+        JSON.stringify(data.user)
+      );
+
+      /*
+       * Keep token only if API ever returns one.
+       * The actual authentication token is stored
+       * securely in the HTTP-only cookie.
+       */
+      if (data.token) {
+        localStorage.setItem(
+          "token",
+          data.token
+        );
+      }
 
       const role = data.user.role;
 
       if (role === "admin") {
-        router.push("/dashboard/admin");
+        router.replace("/dashboard/admin");
+        return;
       }
 
-      else if (role === "doctor") {
-        router.push("/dashboard/doctor");
+      if (role === "doctor") {
+        router.replace("/dashboard/doctor");
+        return;
       }
 
-      else if (role === "receptionist") {
-        router.push("/dashboard/receptionist");
+      if (role === "receptionist") {
+        router.replace("/dashboard/receptionist");
+        return;
       }
 
-      else if (role === "patient") {
-        router.push("/dashboard/patient");
+      if (role === "patient") {
+        if (!data.user.patientId) {
+          setError(
+            "Patient account is missing a Patient ID. Please contact the receptionist."
+          );
+          return;
+        }
+
+        router.replace("/dashboard/patient");
+        return;
       }
-
-      else {
-        setError("Invalid user role.");
-      }
-
-    } catch (error) {
-
-      console.error(error);
 
       setError(
-        "Unable to connect to the server."
+        "Invalid user role. Please contact the administrator."
       );
+    } catch (error) {
+      console.error("Login error:", error);
 
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Unable to connect to the server."
+      );
     } finally {
-
       setLoading(false);
-
     }
   }
 
   return (
     <main className="min-h-screen bg-sky-50 px-6 py-12">
-
       <div className="mx-auto max-w-md">
 
-        {/* HEADER */}
-
         <div className="mb-8 text-center">
-
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-sky-600">
             Clinic-Chain
           </p>
@@ -101,11 +148,7 @@ export default function LoginPage() {
           <p className="mt-3 text-slate-500">
             Login to your Clinic-Chain account.
           </p>
-
         </div>
-
-
-        {/* LOGIN CARD */}
 
         <div className="rounded-3xl border border-sky-100 bg-white p-7 shadow-xl md:p-9">
 
@@ -114,10 +157,7 @@ export default function LoginPage() {
             className="space-y-5"
           >
 
-            {/* EMAIL */}
-
             <div>
-
               <label className="mb-2 block text-sm font-semibold text-slate-700">
                 Email Address
               </label>
@@ -130,16 +170,12 @@ export default function LoginPage() {
                 }
                 placeholder="you@example.com"
                 required
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                disabled={loading}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 disabled:opacity-60"
               />
-
             </div>
 
-
-            {/* PASSWORD */}
-
             <div>
-
               <label className="mb-2 block text-sm font-semibold text-slate-700">
                 Password
               </label>
@@ -152,44 +188,30 @@ export default function LoginPage() {
                 }
                 placeholder="Enter your password"
                 required
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                disabled={loading}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 disabled:opacity-60"
               />
-
             </div>
 
-
-            {/* ERROR */}
-
             {error && (
-
               <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
                 {error}
               </div>
-
             )}
-
-
-            {/* LOGIN BUTTON */}
 
             <button
               type="submit"
               disabled={loading}
               className="w-full rounded-xl bg-sky-600 py-3.5 font-semibold text-white shadow-lg shadow-sky-100 transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-
               {loading
                 ? "Logging in..."
                 : "Login"}
-
             </button>
 
           </form>
 
-
-          {/* REGISTER LINK */}
-
           <div className="mt-7 text-center text-sm text-slate-500">
-
             Don't have an account?{" "}
 
             <Link
@@ -198,13 +220,10 @@ export default function LoginPage() {
             >
               Register
             </Link>
-
           </div>
 
         </div>
-
       </div>
-
     </main>
   );
 }
