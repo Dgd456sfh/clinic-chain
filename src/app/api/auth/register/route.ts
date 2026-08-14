@@ -8,7 +8,10 @@ async function generatePatientId() {
   let patientId = "";
 
   while (true) {
-    const randomNumber = Math.floor(100000 + Math.random() * 900000);
+    const randomNumber = Math.floor(
+      100000 + Math.random() * 900000
+    );
+
     patientId = `CC-PAT-${randomNumber}`;
 
     const existingPatient = await Patient.findOne({
@@ -46,8 +49,17 @@ export async function POST(request: Request) {
     const finalName = fullName || name;
     const cleanEmail = email?.toLowerCase().trim();
 
-    // Required common fields
-    if (!finalName || !cleanEmail || !phone || !password || !role) {
+    // ============================================================
+    // REQUIRED COMMON FIELDS
+    // ============================================================
+
+    if (
+      !finalName ||
+      !cleanEmail ||
+      !phone ||
+      !password ||
+      !role
+    ) {
       return NextResponse.json(
         {
           success: false,
@@ -56,6 +68,10 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    // ============================================================
+    // VALID ROLES
+    // ============================================================
 
     const validRoles = [
       "patient",
@@ -74,7 +90,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Patient-specific validation
+    // ============================================================
+    // PATIENT-SPECIFIC VALIDATION
+    // ============================================================
+
     if (role === "patient") {
       if (!dateOfBirth || !gender || !address) {
         return NextResponse.json(
@@ -87,7 +106,11 @@ export async function POST(request: Request) {
         );
       }
 
-      if (!["Male", "Female", "Other"].includes(gender)) {
+      if (
+        !["Male", "Female", "Other"].includes(
+          gender
+        )
+      ) {
         return NextResponse.json(
           {
             success: false,
@@ -98,7 +121,10 @@ export async function POST(request: Request) {
       }
     }
 
-    // Admin verification
+    // ============================================================
+    // ADMIN VERIFICATION
+    // ============================================================
+
     if (role === "admin") {
       const correctAdminCode =
         process.env.ADMIN_VERIFICATION_CODE ||
@@ -108,14 +134,18 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             success: false,
-            message: "Invalid admin verification code.",
+            message:
+              "Invalid admin verification code.",
           },
           { status: 403 }
         );
       }
     }
 
-    // Check existing User account
+    // ============================================================
+    // CHECK EXISTING USER ACCOUNT
+    // ============================================================
+
     const existingUser = await User.findOne({
       email: cleanEmail,
     });
@@ -124,35 +154,58 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          message: "An account with this email already exists.",
+          message:
+            "An account with this email already exists.",
         },
         { status: 409 }
       );
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // ============================================================
+    // HASH PASSWORD
+    // ============================================================
 
-    // ================= PATIENT REGISTRATION =================
+    const hashedPassword = await bcrypt.hash(
+      password,
+      10
+    );
+
+    // ============================================================
+    // PATIENT REGISTRATION
+    // ============================================================
 
     if (role === "patient") {
-      const patientId = await generatePatientId();
+      const patientId =
+        await generatePatientId();
 
-      // Create Patient record
-      const patient = await Patient.create({
-        patientId,
-        fullName: finalName,
-        dateOfBirth: new Date(dateOfBirth),
-        gender,
-        phone,
-        email: cleanEmail,
-        password: hashedPassword,
-        address,
-        bloodGroup: bloodGroup || "Unknown",
-      });
+      // ==========================================================
+      // CREATE PATIENT RECORD
+      //
+      // IMPORTANT:
+      // Password is NOT stored in Patient.
+      // Password belongs to the User model.
+      // ==========================================================
+
+      const patient =
+        await Patient.create({
+          patientId,
+          fullName: finalName,
+          dateOfBirth: new Date(
+            dateOfBirth
+          ),
+          gender,
+          phone,
+          email: cleanEmail,
+          address,
+          bloodGroup:
+            bloodGroup || "Unknown",
+        });
 
       try {
-        // Create login User account
+        // ========================================================
+        // CREATE LOGIN USER ACCOUNT
+        // ========================================================
+
         const user = await User.create({
           name: finalName,
           email: cleanEmail,
@@ -164,8 +217,12 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             success: true,
-            message: "Patient account created successfully.",
-            patientId: patient.patientId,
+            message:
+              "Patient account created successfully.",
+
+            patientId:
+              patient.patientId,
+
             user: {
               id: user._id,
               name: user.name,
@@ -176,7 +233,10 @@ export async function POST(request: Request) {
           { status: 201 }
         );
       } catch (userError) {
-        // If User creation fails, remove Patient record
+        // ========================================================
+        // ROLLBACK PATIENT IF USER CREATION FAILS
+        // ========================================================
+
         await Patient.deleteOne({
           _id: patient._id,
         });
@@ -185,7 +245,9 @@ export async function POST(request: Request) {
       }
     }
 
-    // ================= OTHER ROLES =================
+    // ============================================================
+    // OTHER ROLES
+    // ============================================================
 
     const user = await User.create({
       name: finalName,
@@ -198,7 +260,9 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: true,
-        message: "Account created successfully.",
+        message:
+          "Account created successfully.",
+
         user: {
           id: user._id,
           name: user.name,
@@ -209,7 +273,10 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Registration error:", error);
+    console.error(
+      "Registration error:",
+      error
+    );
 
     return NextResponse.json(
       {
